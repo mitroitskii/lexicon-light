@@ -21,6 +21,9 @@ from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import pytorch_warmup as warmup
 
+os.environ["CUDA_VISIBLE_DEVICES"]="1" # manually setting cude device to train on kyoto
+#FIXME device should not be hardcoded
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # adding a parent directory to the path so that we can import from modules
 
@@ -196,6 +199,7 @@ def test(probe, test_loader, criterion, return_results=False, k=5):
 
 
 def main(args):
+
     run_name = add_args(f"LAYER{args.layer}-TGTIDX{args.target_idx}-{datasetname(args.train_data)}", args)
     wandb.init(project = args.wandb_proj, name = run_name, config = args, settings=wandb.Settings(start_method="fork"))
  
@@ -290,7 +294,7 @@ if __name__ == '__main__':
 
     # training info for the probe
     parser.add_argument('--probe_model', type=str, choices=['linear', 'mlp', 'rnn'], default='linear')
-    parser.add_argument('--probe_bsz', type=int, default=9)
+    parser.add_argument('--probe_bsz', type=int, default=2)
     parser.add_argument('--probe_lr', type=float, default=1.2)
     parser.add_argument('--probe_wd', type=float, default=1e-3)
     parser.add_argument('--probe_dropout', type=float, default=0.5)

@@ -1,27 +1,83 @@
-# Project Notes
+# Code (Sat, Sun, Mon)
 
-## Work Plan
+## Train MLP (FFN) and RNN
+
+### Run Linear on all layers
+- [ ] ❗️ gotta run on layer -1 for test !
+- [X] how many layers are there in gpt-j?
+  - 28 it seems! (hugging face model card)
+- [X] use .sh script in tmux %%ended up using a wandb sweep%%
+- [X] use best hyperparams so far
+  - using this run https://wandb.ai/baulab/lexicon-cat-probes/runs/bkcrffb2/overview?workspace=user-tentative
+
+### Establish Baseline FFN and RNN
+- [ ] ask chatgtpt good params for mlp and rnn
+  - [ ] add Xavier initialization to rnn and mlp? (see chatgpt). I have Xavier as random option for the linear model
+  - ??? do I need to change warmup_scheduler = warmup.UntunedLinearWarmup(optimizer) ???
+  - describe set up
+  - describe current linear params
+  - describe hyperparams
+  - describe results
+  - 🔥 look at what it suggested before for each of mlp and rnn
+    -  [ ] rename the chatgpt chats for easier search
+- [ ] implement base MLP and RNN
+  - [ ] see recommendation on sizes from coursework
+- [ ] modify sanity_check
+  - [ ] rename files here (baseline instead of sanity check)
+- [ ] ❗️❗️❗️ establish BASELINE for MLP and RNN 
+  - [ ] set up wider (than optimal linear for sanity) but stricter sweep ranges
+    - try SGD again?
+  - [ ] rename reports in the wandb
+  
+- [ ] ❓should I enable shuffle with the linear probe to increase accuracy on test data? (it currently might be overfitting on train)
+- [ ] see HW4 and HW5 for how evaulation tasks were done there (for understanding the MVP !)
+
+### Fully train 
+- [ ] take baseline params and train FFN and RNN on 0 layer
+- [ ] use best on 0 and train on 1-32 (or how many?)
+  
+### Evaluate / Data Analysis
+- [ ] EVALUATE p/r/f1 (or ROUGE, BLEU, or a different metric appropriate for your task)
+- [ ] Do a data analysis / compariosn of results between mmodels / layers in a jupyter notebook?
+- "As a result to present for this project I will be producing loss graphs over at least 5 training epochs for each model. I will also produce a joint graph comparing the performance of the three models."
+
+### Make it my own
+- [ ] create jupyter notebook that samples the data
+  - [ ] reimplement random sampling of the pile from the stored pile dataset just like Sheridan did (that is the way to create a dataset - and I can do it in a jupyter notebook)
+    - leave the cells state as ran
+    - change paths to koyenas files to stub paths to pile dataset (explain how it should look / be structured)
+
+- [ ] ChatGPT - COMMENT THROUGH all scripts
+- [ ] Understand and edit comments  
+  - [ ] How data works
+  - [ ] warm up logic
+- [ ] Simplify 
+  - [ ] remove _complex list comprehension_ etc
+  - [ ] - [ ] Rewrite the state_data.py (change data file such that it ONLY contains the prefix text and nothing else (or maybe only reference to pile doc?)
+  - [ ] change module structure? move state_data into modules.py?
+- [ ] Clean up
+  - [ ] remove workers logic
+  - [ ] ❗️ remove dev COMMENTS
+
+### Make it pretty
+- [ ] add instructions to the top ("Can we run your code by following the instructions at the top of your jupyter notebook/main python file?")
+  - [ ] test and mention how much memory we need to run on batch size 1
+- make a README
+  - [ ] test and mention how much memory we need to run on batch size 1
+- [ ] mention in .sh script how long training for each layer on _which_ gpu takes
 
 
-- [X] see what I commited to in the proposal
-    * data pipeline
-    * models to train
-    * training pipeline
-- [X] see the doc for requirements for check in
-    * 3-5 sentences on progress
-    * 3-5 sentences on roadblocks
-    * UN-cleaned code 
+# Report (Tue)
+
+See and add tasks in [GOOGLE DOC](https://docs.google.com/document/d/1LhdHEw8qLpkogLPIaymseeDFDyasFhjjpoe7gth0tm8/edit)
 
 
-- [ ] see requirements for the final submission too to understand HOW the deliverables right now should look
- - [ ] how should data look?
- - [ ] how commented / understandable / simple (to 6120 standard) the code should be?
-- [ ] how can I __minimize__ the scope of the project given how long it takes to train and optimize the hyperparam space?
-  - maybe only K-1 token?
-  - maybe only FIRST K (just _the_ first?) layers?
+# Slides and Presentation (Wed)
+See and add tasks in [GOOGLE DOC](https://docs.google.com/document/d/1HG5AE1hmcunyZuqOT6LRYiIyh_MSzpA-xpxxt5fgX3E/edit)
 
-To make:
-- run ONE linear model run with my winning params
+
+==============================================================================================
+
 - ❗️bug fix:
   - reduced number of workers from 12 to 0 ❗️ seems to be the crux! 
       - [ ] need to figure out how the number of workers affects the parallelization
@@ -31,118 +87,10 @@ To make:
   - removed a loop from sh script
   - replaced runtorch w python in sh script
 
-
-- ❓❓❓ why is `batch_idx` in train_epoch not defined (a null)? 
-  - it _is_ unrelated to the num of workers (even with 1 worker)
-  - ❗️seems like the solution was in making the batch size lower (below 10, I guess)
-    - ??? why ?
-
-- IMPLEMENT ALL MODELS!!!!!!
-- clean up the training file
-  - get rid of shuffle?
-  - ??? do I need to change warmup_scheduler = warmup.UntunedLinearWarmup(optimizer) ???
-
-- ??? what is a warmup scheduler and why i need it?
-
-- maybe go with below instead???
-
-- ??? got this error at the end of the run - what is it about?
-```
-Traceback (most recent call last):                                                                            
-  File "/share/u/troitskiid/.conda/envs/troitskiid/lib/python3.11/site-packages/pandas/core/indexes/base.py", line 3652, in get_loc
-    return self._engine.get_loc(casted_key)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "pandas/_libs/index.pyx", line 147, in pandas._libs.index.IndexEngine.get_loc
-  File "pandas/_libs/index.pyx", line 176, in pandas._libs.index.IndexEngine.get_loc
-  File "pandas/_libs/hashtable_class_helper.pxi", line 7080, in pandas._libs.hashtable.PyObjectHashTable.get_item
-  File "pandas/_libs/hashtable_class_helper.pxi", line 7088, in pandas._libs.hashtable.PyObjectHashTable.get_item
-KeyError: 'decoded_prefix'
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "/share/u/troitskiid/projects/lexicon_light/scripts/train_probe.py", line 318, in <module>
-    main(args)
-  File "/share/u/troitskiid/projects/lexicon_light/scripts/train_probe.py", line 280, in main
-    test_loss, test_acc, test_topk_acc, test_results = test(probe, test_loader, criterion, return_results=True)
-                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/share/u/troitskiid/projects/lexicon_light/scripts/train_probe.py", line 141, in test
-    for (data, targets, currs, doc_idxs) in baukit.pbar(test_loader):
-  File "/share/u/troitskiid/.conda/envs/troitskiid/lib/python3.11/site-packages/tqdm/std.py", line 1178, in __iter__
-    for obj in iterable:
-  File "/share/u/troitskiid/.conda/envs/troitskiid/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 633, in __next__
-    data = self._next_data()
-           ^^^^^^^^^^^^^^^^^
-  File "/share/u/troitskiid/.conda/envs/troitskiid/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 677, in _next_data
-    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/share/u/troitskiid/.conda/envs/troitskiid/lib/python3.11/site-packages/torch/utils/data/_utils/fetch.py", line 51, in fetch
-    data = [self.dataset[idx] for idx in possibly_batched_index]
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/share/u/troitskiid/.conda/envs/troitskiid/lib/python3.11/site-packages/torch/utils/data/_utils/fetch.py", line 51, in <listcomp>
-    data = [self.dataset[idx] for idx in possibly_batched_index]
-            ~~~~~~~~~~~~^^^^^
-  File "/share/u/troitskiid/projects/lexicon_light/modules/state_data.py", line 188, in __getitem__
-    inp, trout, layer_names = self.get_model_trace(str(doc['decoded_prefix']))
-                                                       ~~~^^^^^^^^^^^^^^^^^^
-  File "/share/u/troitskiid/.conda/envs/troitskiid/lib/python3.11/site-packages/pandas/core/series.py", line 1007, in __getitem__
-    return self._get_value(key)
-           ^^^^^^^^^^^^^^^^^^^^
-  File "/share/u/troitskiid/.conda/envs/troitskiid/lib/python3.11/site-packages/pandas/core/series.py", line 1116, in _get_value
-    loc = self.index.get_loc(label)
-          ^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/share/u/troitskiid/.conda/envs/troitskiid/lib/python3.11/site-packages/pandas/core/indexes/base.py", line 3654, in get_loc
-    raise KeyError(key) from err
-KeyError: 'decoded_prefix'
-```
-
-- [ ] understand the data pipeline
-  - ??? where are the activations stored?
-  - ??? how do we know which token is the prefix to the current one?
-  - ??? where are we sourcing the information from?
-- [ ] comment with chatgpt state_data.py
-- [ ] Rewrite the state_data.py (change data file such that it ONLY contains the prefix text and nothing else (or maybe only reference to pile doc?)
-- [ ] change module structure? move state_data into modules.py?
-- [ ] Rewrite the train script?
-      * maybe not a fully working now? no need to test...
-    - [ ] ❗️ TRY to run
-    - [ ] simplify (get rid of warmups and other fancy training stuff (check if they had anything like that in the class))
-
-- [ ] comment! - @based on Sheridan's code
-- [ ] ❗️ remove dev COMMENTS
-
-- [ ] reimplement random sampling of the pile from the stored pile dataset just like Sheridan did (that is the way to create a dataset - and I can do it in a jupyter notebook)
-    - leave the cells state as ran
-    - change paths to koyenas files to stub paths to pile dataset (explain how it should look / be structured)
-
-- [ ] add Xavier initialization to rnn and mlp? (see chatgpt). I have Xavier as random option for the linear model
-
-Report:
-- created data (randomly sample 500 for val, test and train from downloaded pile)
-- created linear model 
-- created the training pipeline
-  - set up wandb 
-
-Roadblocks:
-- bad training; doing the sanity check + pinv init
-- not enough time to implement beyond linear?
-- pipeline but not training?
-- ??? report on the cuda memory issued?
-
-
-Further goals
-- [ ] see what we have used in the course for model / ngram training to know the limits ???
-- [ ] change project structure to something simpler the way we have in 6120 project?
-- [ ] create a pynotebook with experiments!
-  - ??? model it upon Sheridan's scripts/explore.ipynb ?
-- [ ] Write a report
-
-
 REMOVED:
 - weighted_mse from train_gptj_probe and training.py
 - init_matrix from training->LinearModel and train_gptj_probe
 
-## Analysis of current project (nocache branch)
 
 modules/
 - ??? helpers.py - what do i need this one for?
