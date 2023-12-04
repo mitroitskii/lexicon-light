@@ -11,8 +11,13 @@
   - using this run https://wandb.ai/baulab/lexicon-cat-probes/runs/bkcrffb2/overview?workspace=user-tentative
 
 ### Establish Baseline FFN and RNN
+
+- mlp sanity probe takes 16706MiB to run
+- rnn sanity probe take 18358MiB to run
+
 - [ ] ask chatgtpt good params for mlp and rnn
-  - [ ] add Xavier initialization to rnn and mlp? (see chatgpt). I have Xavier as random option for the linear model
+  - [X] add Xavier initialization to rnn and mlp? (see chatgpt). I have Xavier as random option for the linear model
+  - prompt: "with advanced understanding of deep learning theory and mathematics (give example of lectures)"
   - ??? do I need to change warmup_scheduler = warmup.UntunedLinearWarmup(optimizer) ???
   - describe set up
   - describe current linear params
@@ -20,6 +25,7 @@
   - describe results
   - 🔥 look at what it suggested before for each of mlp and rnn
     -  [ ] rename the chatgpt chats for easier search
+- ??? which parameters to Sweep Over ?
 - [ ] implement base MLP and RNN
   - [ ] see recommendation on sizes from coursework
 - [ ] modify sanity_check
@@ -40,12 +46,14 @@
 - [ ] EVALUATE p/r/f1 (or ROUGE, BLEU, or a different metric appropriate for your task)
 - [ ] Do a data analysis / compariosn of results between mmodels / layers in a jupyter notebook?
 - "As a result to present for this project I will be producing loss graphs over at least 5 training epochs for each model. I will also produce a joint graph comparing the performance of the three models."
+- ??? create visualizations of wandb evaulations via seaborn??
 
 ### Make it my own
-- [ ] create jupyter notebook that samples the data
+- [ ] create jupyter notebook that samples the data OR MAYBE NOT (nnot super important)
   - [ ] reimplement random sampling of the pile from the stored pile dataset just like Sheridan did (that is the way to create a dataset - and I can do it in a jupyter notebook)
     - leave the cells state as ran
     - change paths to koyenas files to stub paths to pile dataset (explain how it should look / be structured)
+
 
 - [ ] ChatGPT - COMMENT THROUGH all scripts
 - [ ] Understand and edit comments  
@@ -58,6 +66,7 @@
 - [ ] Clean up
   - [ ] remove workers logic
   - [ ] ❗️ remove dev COMMENTS
+  - [ ] do not commit wandb logs and checkpoints
 
 ### Make it pretty
 - [ ] add instructions to the top ("Can we run your code by following the instructions at the top of your jupyter notebook/main python file?")

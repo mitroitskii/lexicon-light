@@ -21,11 +21,13 @@ from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import pytorch_warmup as warmup
 
+
 os.environ["CUDA_VISIBLE_DEVICES"]="1" # manually setting cude device to train on kyoto
 #FIXME device should not be hardcoded
 
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-# adding a parent directory to the path so that we can import from modules
+# adding a parent directory to the path so that we can import from modules (this line of code needs to be here in the middle before the modules are imported)
 
 from modules.training import LinearModel, MLPModel, RNNModel, _topkprobs, _topktoks
 from modules.state_data import HiddenStateDataset, hs_collate, DocDataset, DocCollate
@@ -228,13 +230,13 @@ def main(args):
     
     probe = None
     if args.probe_model == 'linear':
-        probe = LinearModel(model.lm_head.in_features * 2, VOCAB_SIZE).to(device)
+        probe = LinearModel(model.lm_head.in_features * 2, VOCAB_SIZE).to(device) # ??? why *2
         wandb.watch(probe)
     elif args.probe_model == 'mlp':
         probe = MLPModel(model.lm_head.in_features * 2, VOCAB_SIZE, dropout_rate=args.probe_dropout).to(device)
         wandb.watch(probe)
     elif args.probe_model == 'rnn':
-        probe = RNNModel(model.lm_head.in_features * 2, VOCAB_SIZE, dropout_rate=args.probe_dropout).to(device)
+        probe = RNNModel(model.lm_head.in_features * 2, VOCAB_SIZE).to(device)
         wandb.watch(probe)
 
     # drop_last must be True for val and test so that we can average over batch loss avgs. 

@@ -25,7 +25,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # adding a parent directory to the path so that we can import from modules @dmitrii
 
 from modules.state_data import hs_collate
-from modules.training import EarlyStopper, LinearModel, _topkprobs, _topktoks, weighted_mse, svd_init
+from modules.training import LinearModel, MLPModel, RNNModel, _topkprobs, _topktoks
+
+os.environ["CUDA_VISIBLE_DEVICES"]="0" # manually setting cude device to train on kyoto
+#FIXME device should not be hardcoded
 
 lt.monkey_patch()
 gc.collect()
@@ -261,25 +264,17 @@ def main(args):
     dataset = AllEmbeds(model, tokenizer, MODEL_NAME,
                         WINDOW_SIZE, VOCAB_SIZE, device)
 
-    # initialize matrix with inverted embed matrix if desired. have to stack it along with zeros
-    init_matrix = None
-    if args.probe_init == 'pinv':
-        # model.tok_embeddings.weight if "llama" in MODEL_NAME else
-        embed_weights = model.transformer.wte.weight
-        inverse = torch.tensor(np.linalg.pinv(
-            np.array(embed_weights.cpu(), dtype=np.float32)))
-
-        # for when you're not catting
-        init_matrix = inverse.transpose(0, 1)
-        # for when you're catting
-        # init_matrix = torch.cat([inverse, torch.zeros_like(inverse)], dim=0).transpose(0, 1) # creates (89192, 50400).T
-        # (4096, 50400) inverse, a wide rectangle
-        # (8192, 50400) two wide rectangles stacked on top of e/o
-        # so we want to make that second rectangle just zeros.
-
-    linear_probe = LinearModel(
-        model.lm_head.in_features, VOCAB_SIZE, init_matrix=init_matrix).to(device)
-    wandb.watch(linear_probe)
+    probe = None
+    print('❗️ Input size:', model.lm_head.in_features, 'Output size:', VOCAB_SIZE)
+    if args.probe_model == 'linear':
+        probe = LinearModel(model.lm_head.in_features, VOCAB_SIZE).to(device)
+        wandb.watch(probe)
+    elif args.probe_model == 'mlp':
+        probe = MLPModel(model.lm_head.in_features, VOCAB_SIZE, dropout_rate=args.probe_dropout).to(device)
+        wandb.watch(probe)
+    elif args.probe_model == 'rnn':
+        probe = RNNModel(model.lm_head.in_features, VOCAB_SIZE).to(device)
+        wandb.watch(probe)
 
     # drop_last must be True for val and test so that we can average over batch loss avgs.
     kwargs = {}
@@ -291,40 +286,29 @@ def main(args):
     val_loader = DataLoader(dataset=dataset, batch_size=args.probe_bsz, collate_fn=allembeds_collate,
                             drop_last=False, pin_memory=True, **kwargs)
 
-    if args.probe_init == 'leastsq':
-        temp_loader = DataLoader(dataset=dataset, batch_size=len(
-            dataset), collate_fn=allembeds_collate, drop_last=False, pin_memory=True, shuffle=False, **kwargs)
-        (data, targets) = next(iter(temp_loader))
-        svd_init(linear_probe, data, targets)
-
     optimizer = None
     warmup_scheduler = None
     if args.optimizer == 'SGD':
-        optimizer = torch.optim.SGD(linear_probe.parameters(
+        optimizer = torch.optim.SGD(probe.parameters(
         ), lr=args.probe_lr, momentum=args.probe_momentum)
     elif args.optimizer == 'AdamW':
         optimizer = torch.optim.AdamW(
-            linear_probe.parameters(), lr=args.probe_lr)  # no momentum
+            probe.parameters(), lr=args.probe_lr)  # no momentum
         warmup_scheduler = warmup.UntunedLinearWarmup(optimizer)
 
-    criterion = {
-        "weighted_mse": weighted_mse,
-        "ce": F.cross_entropy,
-        "mse": F.mse_loss
-    }[args.criterion]
+    criterion = F.cross_entropy
     scheduler = ReduceLROnPlateau(optimizer, mode='min', patience=3)
-    early_stopper = EarlyStopper(patience=5, min_delta=0.01)
 
     print('training linear probe...')
     batches_seen = 0
     for epoch in range(args.probe_epochs):
         print('# Epoch {} #'.format(epoch))
-        batches_seen = train_epoch(epoch, linear_probe, train_loader, criterion, optimizer,
+        batches_seen = train_epoch(epoch, probe, train_loader, criterion, optimizer,
                                    warmup_scheduler, args.accumulate, args.clip_threshold, batches_seen)
 
         # log validation loss at the end of each epoch to decide early stopping
         val_loss, val_acc, val_topk_acc = test(
-            linear_probe, val_loader, criterion, return_results=False)
+            probe, val_loader, criterion, return_results=False)
         wandb.log({"val_loss": val_loss, "val_acc": val_acc,
                   "val_topk_acc": val_topk_acc})
 
@@ -334,15 +318,11 @@ def main(args):
         else:
             scheduler.step(val_loss)
 
-        if early_stopper.early_stop(val_loss):
-            print(
-                f"early stopping after Epoch {epoch}, val_loss={val_loss} min_val_loss={early_stopper.min_val_loss}")
-            break
 
     # Get final testing accuracy and prediction results
-    torch.save(linear_probe.state_dict(), f"{checkpoint_dir}/final.ckpt")
+    torch.save(probe.state_dict(), f"{checkpoint_dir}/final.ckpt")
     test_loss, test_acc, test_topk_acc, test_results = test(
-        linear_probe, val_loader, criterion, return_results=True)
+        probe, val_loader, criterion, return_results=True)
     test_results.to_csv(
         log_dir + f"/sanityprobe_results.csv", quoting=csv.QUOTE_ALL)
 
@@ -357,21 +337,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # training info for linear probe
+    parser.add_argument('--probe_model', type=str, choices=['linear', 'mlp', 'rnn'], default='linear')
     parser.add_argument('--probe_bsz', type=int, default=5)
     parser.add_argument('--probe_lr', type=float, default=5e-5)
     parser.add_argument('--probe_momentum', type=float, default=0.9)
     parser.add_argument('--probe_epochs', type=int, default=5)
-    parser.add_argument('--probe_init', type=str, choices=['random', 'pinv', 'leastsq'], default='random',
-                        help="whether to initialize probe `random` or using the pseudo-inverse of the embed matrix `pinv`.")
-
-    parser.add_argument('--wandb_proj', type=str, default='lexicon-cat-probes')
+    parser.add_argument('--probe_dropout', type=float, default=0.5)
     parser.add_argument('--accumulate', type=int, default=1)
     parser.add_argument('--clip_threshold', type=float, default=0.0)
     parser.add_argument('--optimizer', type=str,
                         choices=['SGD', 'AdamW'], default='SGD')
     parser.add_argument('--num_workers', type=int, default=0)
-    parser.add_argument('--criterion', type=str,
-                        choices=['weighted_mse', 'ce', 'mse'], default='ce')
+    parser.add_argument('--wandb_proj', type=str, default='lexicon-cat-probes')
 
     args = parser.parse_args()
     main(args)

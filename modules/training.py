@@ -27,6 +27,8 @@ class LinearModel(nn.Module):
     def __init__(self, input_size, output_size):
         super(LinearModel, self).__init__()
         self.fc = nn.Linear(input_size, output_size)
+
+        # Xavier initialization
         nn.init.xavier_uniform_(self.fc.weight)
 
     def forward(self, x):
@@ -44,6 +46,10 @@ class MLPModel(nn.Module):
         self.dropout = nn.Dropout(dropout_rate)
         self.fc2 = nn.Linear(hidden_size, output_size)
 
+        # Xavier initialization
+        nn.init.xavier_uniform_(self.fc1.weight)
+        nn.init.xavier_uniform_(self.fc2.weight)
+
     def forward(self, x):
         x = self.fc1(x)
         x = self.relu(x)
@@ -60,6 +66,19 @@ class RNNModel(nn.Module):
         self.rnn = nn.LSTM(input_size, hidden_size,
                            num_layers=1, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
+
+        # Xavier initialization for LSTM weights
+        for name, param in self.rnn.named_parameters():
+            if 'weight_ih' in name:
+                nn.init.xavier_uniform_(param.data)
+            elif 'weight_hh' in name:
+                nn.init.xavier_uniform_(param.data)
+            elif 'bias' in name:
+                param.data.fill_(0)
+
+        # Xavier initialization for the fully connected layer
+        nn.init.xavier_uniform_(self.fc.weight)
+        nn.init.zeros_(self.fc.bias)
 
     def forward(self, x):
         # x: (batch_size, sequence_length, input_size)
