@@ -13,12 +13,21 @@
 ### Establish Baseline FFN and RNN
 
 - mlp sanity probe takes 16706MiB to run
-- rnn sanity probe take 18358MiB to run
+- rnn sanity probe takes 18358MiB to run
 
+- [X] PAUSE linear over all layers
+
+- [ ] make an interesting version of rnn
+- [ ] run rnn baseline sweep
+
+- [ ] run mlp l0 sweep (see linear sweep as reference)
+
+- [ ] gather the successful linear probe sanity check run sweep data for chat gpt prompt
 - [ ] ask chatgtpt good params for mlp and rnn
   - [X] add Xavier initialization to rnn and mlp? (see chatgpt). I have Xavier as random option for the linear model
-  - prompt: "with advanced understanding of deep learning theory and mathematics (give example of lectures)"
-  - ??? do I need to change warmup_scheduler = warmup.UntunedLinearWarmup(optimizer) ???
+  - [X] prompt: "with advanced understanding of deep learning theory and mathematics (give example of lectures)"
+  - [X]  do I need to change warmup_scheduler = warmup.UntunedLinearWarmup(optimizer) ??? %%yeah, it seems fine%%%
+  - [ ] if very detailed prompt with all the code doesn't help, present a description of training set up, the sweep results and describe model configs (vocab size values etc)
   - describe set up
   - describe current linear params
   - describe hyperparams
@@ -28,6 +37,7 @@
 - ??? which parameters to Sweep Over ?
 - [ ] implement base MLP and RNN
   - [ ] see recommendation on sizes from coursework
+  - [ ] use CURRENT PARAMS ::as default::
 - [ ] modify sanity_check
   - [ ] rename files here (baseline instead of sanity check)
 - [ ] ❗️❗️❗️ establish BASELINE for MLP and RNN 
@@ -39,11 +49,17 @@
 - [ ] see HW4 and HW5 for how evaulation tasks were done there (for understanding the MVP !)
 
 ### Fully train 
+- [ ] train mlp on layer 0 with basic successful hypers
+  - [ ] do a sweep over additional chatgpt suggested features - see results
+
 - [ ] take baseline params and train FFN and RNN on 0 layer
 - [ ] use best on 0 and train on 1-32 (or how many?)
   
 ### Evaluate / Data Analysis
 - [ ] EVALUATE p/r/f1 (or ROUGE, BLEU, or a different metric appropriate for your task)
+- [ ] make wandb graph of layer/test_acc corelation
+- [ ]  compare set ups  / hyper params for diff models WITH EACH OTHER
+
 - [ ] Do a data analysis / compariosn of results between mmodels / layers in a jupyter notebook?
 - "As a result to present for this project I will be producing loss graphs over at least 5 training epochs for each model. I will also produce a joint graph comparing the performance of the three models."
 - ??? create visualizations of wandb evaulations via seaborn??
@@ -54,6 +70,7 @@
     - leave the cells state as ran
     - change paths to koyenas files to stub paths to pile dataset (explain how it should look / be structured)
 
+- [ ] save sweep set ups as .yaml files?
 
 - [ ] ChatGPT - COMMENT THROUGH all scripts
 - [ ] Understand and edit comments  

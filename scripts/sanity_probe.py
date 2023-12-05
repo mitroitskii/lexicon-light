@@ -265,7 +265,6 @@ def main(args):
                         WINDOW_SIZE, VOCAB_SIZE, device)
 
     probe = None
-    print('❗️ Input size:', model.lm_head.in_features, 'Output size:', VOCAB_SIZE)
     if args.probe_model == 'linear':
         probe = LinearModel(model.lm_head.in_features, VOCAB_SIZE).to(device)
         wandb.watch(probe)
