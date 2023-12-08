@@ -1,7 +1,7 @@
 # Code 
   
 ## Evaluate / Data Analysis
-- [ ] EVALUATE p/r/f1 (or ROUGE, BLEU, or a different metric appropriate for your task)
+- [X] EVALUATE p/r/f1 (or ROUGE, BLEU, or a different metric appropriate for your task)
 - [ ] make wandb graph of layer/test_acc corelation
 - [ ]  compare set ups  / hyper params for diff models WITH EACH OTHER
 - "As a result to present for this project I will be producing loss graphs over at least 5 training epochs for each model. I will also produce a joint graph comparing the performance of the three models."
@@ -9,9 +9,11 @@
 - [ ] see HW4 and HW5 for how evaulation tasks were done there (for understanding the MVP !)
 - [ ] Do a data analysis / compariosn of results between mmodels / layers in a jupyter notebook?
 
+
+
 ## Make it my own
 - [ ] modify sanity_check
-  - [ ] rename files here (baseline instead of sanity check)
+  - [X] rename files here (baseline instead of sanity check)
 
 
 - [ ] ChatGPT - COMMENT THROUGH all scripts
