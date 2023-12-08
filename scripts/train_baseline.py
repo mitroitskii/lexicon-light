@@ -22,10 +22,11 @@ import pytorch_warmup as warmup
 import lovely_tensors as lt
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-# adding a parent directory to the path so that we can import from modules @dmitrii
+# adding a parent directory to the path so that we can import from modules (this line of code needs to be here in the middle before the modules are imported)
 
 from modules.state_data import hs_collate
-from modules.training import LinearModel, MLPModel, RNNModel, _topkprobs, _topktoks
+from modules.training import _topkprobs, _topktoks
+from modules.models import LinearModel, MLPModel, RNNModel
 
 os.environ["CUDA_VISIBLE_DEVICES"]="0" # manually setting cude device to train on kyoto
 #FIXME device should not be hardcoded
@@ -63,11 +64,8 @@ class AllEmbeds(torch.utils.data.Dataset):
 
     # when tokenizing make sure to include BOS token at beginning as "padding"
     def tokenize(self, text):
-        if "llama" in self.model_name:
-            t = torch.tensor(self.tokenizer.encode(text, bos=True, eos=False))
-        else:
-            bos = self.tokenizer.bos_token
-            t = self.tokenizer(bos+text)
+        bos = self.tokenizer.bos_token
+        t = self.tokenizer(bos+text)
 
         if len(t) > self.window_size:
             return t[:self.window_size]
@@ -79,15 +77,6 @@ class AllEmbeds(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         return index
-        # inp = torch.tensor(index).to(self.device)
-
-        # if "llama" in self.model_name:
-        #     embed = model.tok_embeddings(inp).squeeze().cpu().float()
-        # else:
-        #     embed = model.transformer.wte(inp).squeeze().cpu().float()
-
-        # onehot = torch.tensor(np.eye(self.vocab_size)[index], device='cpu')
-        # return torch.tensor(0, device='cpu'), embed, onehot, onehot
 
 # the workhorse.
 
@@ -95,11 +84,7 @@ class AllEmbeds(torch.utils.data.Dataset):
 def allembeds_collate(batch):
     # batch is a list of indexes
     inp = torch.tensor(batch).to(device)
-
-    if "llama" in MODEL_NAME:
-        embed = model.tok_embeddings(inp).squeeze().cpu().float()
-    else:
-        embed = model.transformer.wte(inp).squeeze().cpu().float()
+    embed = model.transformer.wte(inp).squeeze().cpu().float()
 
     onehot = torch.tensor(np.eye(VOCAB_SIZE)[batch], device='cpu')
     return embed, onehot
@@ -167,10 +152,10 @@ def train_epoch(epoch, probe, train_loader, criterion, optimizer, warmup_schedul
         if batch_idx % max(accumulate, 10) == 0 or batch_idx == len(train_loader) - 1:
             train_acc = 100 * \
                 (sum(_topktoks(output) == _topktoks(target)) / len(output))
-            if torch.isinf(train_acc).any():
+            if torch.isinf(train_acc).any(): # if there are any infinities in the training accuracy
                 print('denom', len(output), 'numerator', sum(
-                    _topktoks(output) == _topktoks(target)))
-                print(_topktoks(output), _topktoks(target))
+                    _topktoks(output) == _topktoks(target))) # print the numerator and denominator
+                print(_topktoks(output), _topktoks(target)) # print the offending tokens
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tTraining Acc:{:3.3f}%\tBatch Loss: {:.6f} ({} tokens)'.format(
                 epoch, batch_idx, len(train_loader), 100. *
                 batch_idx / len(train_loader),
@@ -250,10 +235,9 @@ def test(probe, test_loader, criterion, return_results=False, k=5):
 
 
 def main(args):
-    run_name = add_args("SANITYPROBE", args)
+    run_name = add_args("BASELINE", args)
     wandb.init(project=args.wandb_proj, name=run_name, config=args,
                settings=wandb.Settings(start_method="fork"))
-    print("shuffle: HiddenStateDataset+hs_collate")
 
     # make dirs that include the wandb id
     checkpoint_dir = f"../checkpoints/{MODEL_NAME}/{run_name}-{wandb.run.id}"

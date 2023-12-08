@@ -21,16 +21,16 @@ from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import pytorch_warmup as warmup
 
-
-os.environ["CUDA_VISIBLE_DEVICES"]="1" # manually setting cude device to train on kyoto
-#FIXME device should not be hardcoded
-
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # adding a parent directory to the path so that we can import from modules (this line of code needs to be here in the middle before the modules are imported)
 
-from modules.training import LinearModel, MLPModel, RNNModel, _topkprobs, _topktoks
+
+from modules.training import _topkprobs, _topktoks
+from modules.models import LinearModel, MLPModel, RNNModel
 from modules.state_data import HiddenStateDataset, hs_collate, DocDataset, DocCollate
+
+os.environ["CUDA_VISIBLE_DEVICES"]="1" # manually setting cude device to train on kyoto
+#FIXME device should not be hardcoded
 
 gc.collect()
 torch.cuda.empty_cache()
@@ -205,12 +205,8 @@ def main(args):
     run_name = add_args(f"LAYER{args.layer}-TGTIDX{args.target_idx}-{datasetname(args.train_data)}", args)
     wandb.init(project = args.wandb_proj, name = run_name, config = args, settings=wandb.Settings(start_method="fork"))
  
-    print("shuffle: HiddenStateDataset+hs_collate" if args.shuffle else "no-shuffle: DocDataset+doc_collate")
-    # if args.shuffle:
-    #     raise Exception("Shuffling not yet implemented for GPT-J hidden states. Please use --no-shuffle.")
-    #     sys.exit()
-    if not args.shuffle and args.probe_bsz > 10:
-        print(f"Warning: when --not-shuffle, batch size represents number of documents. {args.probe_bsz}>10, you may want to use a smaller batch size.")
+    if args.probe_bsz > 10:
+        print(f"The batch size represents number of documents. {args.probe_bsz}>10, you may want to use a smaller batch size.")
 
     # make dirs that include the wandb id
     checkpoint_dir = f"../checkpoints/{MODEL_NAME}/{run_name}-{wandb.run.id}"
@@ -222,8 +218,8 @@ def main(args):
     val_data = pd.read_csv(args.val_data)
     test_data = pd.read_csv(args.test_data)
 
-    collate_fn = hs_collate if args.shuffle else DocCollate(args.target_idx)
-    dset = HiddenStateDataset if args.shuffle else DocDataset
+    collate_fn = DocCollate(args.target_idx)
+    dset = DocDataset
     train_dataset = dset(model, tokenizer, MODEL_NAME, args.layer, args.target_idx, train_data, WINDOW_SIZE, VOCAB_SIZE, device)
     val_dataset = dset(model, tokenizer, MODEL_NAME, args.layer, args.target_idx, val_data, WINDOW_SIZE, VOCAB_SIZE, device)
     test_dataset = dset(model, tokenizer, MODEL_NAME, args.layer, args.target_idx, test_data, WINDOW_SIZE, VOCAB_SIZE, device)
@@ -245,7 +241,7 @@ def main(args):
         kwargs['num_workers'] = args.num_workers
         kwargs['multiprocessing_context'] = 'spawn' # helps with lab machines
     train_loader = DataLoader(dataset=train_dataset, batch_size=args.probe_bsz, collate_fn=collate_fn, 
-        drop_last=True, pin_memory=True, shuffle=args.shuffle, **kwargs) 
+        drop_last=True, pin_memory=True, shuffle=False, **kwargs) 
     print(f"❗️ train_loader: {len(train_loader)} batches") #FIXME debug remove
     val_loader = DataLoader(dataset=val_dataset, batch_size=args.probe_bsz, collate_fn=collate_fn, 
         drop_last=True, pin_memory=True, **kwargs)
@@ -296,17 +292,16 @@ if __name__ == '__main__':
 
     # training info for the probe
     parser.add_argument('--probe_model', type=str, choices=['linear', 'mlp', 'rnn'], default='linear')
-    parser.add_argument('--probe_bsz', type=int, default=2)
-    parser.add_argument('--probe_lr', type=float, default=1.2)
-    parser.add_argument('--probe_wd', type=float, default=1e-3)
+    parser.add_argument('--probe_bsz', type=int, default=6)
+    parser.add_argument('--probe_lr', type=float, default=2.18)
+    parser.add_argument('--probe_wd', type=float, default=0.003)
     parser.add_argument('--probe_dropout', type=float, default=0.5)
-    parser.add_argument('--probe_momentum', type=float, default=1.6)
-    parser.add_argument('--probe_epochs', type=int, default=3)    
+    parser.add_argument('--probe_momentum', type=float, default=1.53)
+    parser.add_argument('--probe_epochs', type=int, default=14)    
     parser.add_argument('--wandb_proj', type=str, default='lexicon-cat-probes')
     parser.add_argument('--accumulate', type=int, default=1)
-    parser.add_argument('--clip_threshold', type=float, default=0.1)
+    parser.add_argument('--clip_threshold', type=float, default=0.16)
     parser.add_argument('--optimizer', type=str, choices=['SGD', 'AdamW'], default='AdamW')
-    parser.add_argument('--shuffle', action=argparse.BooleanOptionalAction)
     parser.add_argument('--num_workers', type=int, default=0)
 
     # document data locations
