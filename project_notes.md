@@ -1,51 +1,34 @@
 # Code 
   
-## Evaluate / Data Analysis
-- [X] EVALUATE p/r/f1 (or ROUGE, BLEU, or a different metric appropriate for your task)
-- [ ] make wandb graph of layer/test_acc corelation
-- [ ]  compare set ups  / hyper params for diff models WITH EACH OTHER
-- "As a result to present for this project I will be producing loss graphs over at least 5 training epochs for each model. I will also produce a joint graph comparing the performance of the three models."
-
-- [ ] see HW4 and HW5 for how evaulation tasks were done there (for understanding the MVP !)
-- [ ] Do a data analysis / compariosn of results between mmodels / layers in a jupyter notebook?
-
-
 
 ## Make it my own
-- [ ] modify sanity_check
+- [X] modify sanity_check
   - [X] rename files here (baseline instead of sanity check)
 
-
-- [ ] ChatGPT - COMMENT THROUGH all scripts
-- [ ] Understand and edit comments  
-  - [ ] How data works
-  - [ ] warm up logic
-- [ ] add instructions to the top ("Can we run your code by following the instructions at the top of your jupyter notebook/main python file?")
-  - [ ] test and mention how much memory we need to run on batch size 1
-- make a README
-  - [ ] test and mention how much memory we need to run on batch size 1
-- [ ] mention in .sh script how long training for each layer on _which_ gpu takes
-- [ ] Simplify 
-  - [ ] remove _complex list comprehension_ etc
-  - [ ] - [ ] Rewrite the state_data.py (change data file such that it ONLY contains the prefix text and nothing else (or maybe only reference to pile doc?)
-  - [ ] change module structure? move state_data into modules.py?
-- [ ] Clean up
-  - [ ] remove workers logic
-  - [ ] ❗️ remove dev COMMENTS
-  - [ ] do not commit wandb logs and checkpoints
+- [X] ChatGPT - COMMENT THROUGH all scripts
+- [X] Understand and edit comments  
+  - [X] How data works
+  - [X] warm up logic
+- [X] add instructions to the top ("Can we run your code by following the instructions at the top of your jupyter notebook/main python file?")
+  - [X] test and mention how much memory we need to run on batch size 1
+- [X] mention in .sh script how long training for each layer on _which_ gpu takes
+- [X] move baseline dataset and collate fns to
+- [X] Simplify 
+  - [X] remove _complex list comprehension_ etc
+  - [X] change module structure? move state_data into modules.py?
+- [X] Clean up
+  - [X] ❗️ remove dev COMMENTS
+  - [X] clean FIXMEs
+  - [X] do not commit wandb logs and checkpoints
+- [ ] ❗️ TEST both scripts before submitting
 
 - ??? create visualizations of wandb evaulations via seaborn??
-
 - [ ] create jupyter notebook that samples the data OR MAYBE NOT (nnot super important)
   - [ ] reimplement random sampling of the pile from the stored pile dataset just like Sheridan did (that is the way to create a dataset - and I can do it in a jupyter notebook)
     - leave the cells state as ran
     - change paths to koyenas files to stub paths to pile dataset (explain how it should look / be structured)
 
 - [ ] save sweep set ups as .yaml files?
-
-## Make it pretty
-  - [ ] rename reports in the wandb
-  - [ ] clean FIXMEs
 
 
 # Report
@@ -55,10 +38,16 @@ See and add tasks in [GOOGLE DOC](https://docs.google.com/document/d/1LhdHEw8qLp
 # Slides and Video
 See and add tasks in [GOOGLE DOC](https://docs.google.com/document/d/1HG5AE1hmcunyZuqOT6LRYiIyh_MSzpA-xpxxt5fgX3E/edit)
 
+==============================================================================================
 
+# More stuff
 
+## Evaluate / Data Analysis
+- [X] EVALUATE p/r/f1 (or ROUGE, BLEU, or a different metric appropriate for your task)
+- [X] make wandb graph of layer/test_acc corelation
+- "As a result to present for this project I will be producing loss graphs over at least 5 training epochs for each model. I will also produce a joint graph comparing the performance of the three models."
 
-# Bonus stuff
+- [ ] Do a data analysis / compariosn of results between mmodels / layers in a jupyter notebook?
 
 ## Run Linear on all layers
 - [ ] ❗️ gotta run on layer -1 for test !

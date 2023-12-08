@@ -3,21 +3,20 @@ Train a model to predict a token from the embedding on an evenly-sampled
 distribution of all of the embeddings across the vocabulary
 '''
 # partially adapted from https://github.com/sfeucht/lexicon and modified as part of a research project at David Bau's lab
+
 # to run this script, use the following command:
 # `python train_baseline.py`
 # the run takes ~12GB-20 of GPU memory depending on the model, so make sure you have enough memory (linear is the smallest, then MLP, then RNN)
 # to be able to log the run with wandb, you need to have a wandb account and be logged in via a wandb cli tool (https://docs.wandb.ai/quickstart)
+
 import sys
 import gc
 import torch
 import argparse
 import os
-import csv
 import wandb    
-import baukit
-import regex as re
+import baukit # useful utitilies for interpetability
 import numpy as np
-import pandas as pd
 import torch.nn.functional as F
 from transformers import GPTJForCausalLM, AutoTokenizer
 from torch.utils.data import DataLoader
@@ -28,9 +27,9 @@ import lovely_tensors as lt
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # adding a parent directory to the path so that we can import from modules (this line of code needs to be here in the middle before the modules are imported)
 
-from modules.state_data import hs_collate
 from modules.training import _topkprobs, _topktoks
 from modules.models import LinearModel, MLPModel, RNNModel
+from modules.state_data import AllEmbeds
 
 lt.monkey_patch()
 gc.collect()
@@ -38,68 +37,25 @@ torch.cuda.empty_cache()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 wandb.login()
 
-WINDOW_SIZE = 2048
-MODEL_NAME = "EleutherAI/gpt-j-6b"  # "lmsys/vicuna-7b-v1.3"
+WINDOW_SIZE = 2048 # truncate documents from training data to this many tokens
+MODEL_NAME = "EleutherAI/gpt-j-6b"
 VOCAB_SIZE = 50400
 model, tokenizer = (
     GPTJForCausalLM.from_pretrained(
         MODEL_NAME, revision="float16", torch_dtype=torch.float16).cuda(),
     AutoTokenizer.from_pretrained(MODEL_NAME)
 )
-baukit.set_requires_grad(False, model)
+baukit.set_requires_grad(False, model) # freeze the model
 
 torch.set_default_dtype(torch.float32)
 
-
-class AllEmbeds(torch.utils.data.Dataset):
-    def __init__(self, model, tokenizer, model_name, window_size, vocab_size, device):
-        self.model = model
-        self.tokenizer = tokenizer
-        self.model_name = model_name
-        self.window_size = window_size
-        self.vocab_size = vocab_size
-        self.device = device
-
-        self.layer_name = -1
-        self.target_idx = 0
-
-    # when tokenizing make sure to include BOS token at beginning as "padding"
-    def tokenize(self, text):
-        bos = self.tokenizer.bos_token
-        t = self.tokenizer(bos+text)
-
-        if len(t) > self.window_size:
-            return t[:self.window_size]
-        else:
-            return t
-
-    def __len__(self):
-        return self.vocab_size
-
-    def __getitem__(self, index):
-        return index
-
-# the workhorse.
-
-
-def allembeds_collate(batch):
-    # batch is a list of indexes
-    inp = torch.tensor(batch).to(device)
-    embed = model.transformer.wte(inp).squeeze().cpu().float()
-
-    onehot = torch.tensor(np.eye(VOCAB_SIZE)[batch], device='cpu')
-    return embed, onehot
-
-
-def logitlens(state):
-    return model.lm_head(state)
-
-
 def datasetname(input):
+    # returns the name of the dataset from the path
     return input.split('/')[-1][:-4]
 
 
 def add_args(s, args):
+    # adds the arguments to the run name
     for k, v in vars(args).items():
         if k in ['probe_bsz', 'probe_epochs']:
             s += f"-{k[6:]}{v}"
@@ -108,40 +64,44 @@ def add_args(s, args):
     return s
 
 
-'''
-Trains a probe for a single epoch and logs loss/accuracy.
-
-Parameters:
-    epoch: index of the current epoch
-    probe: linear model to be trained
-    train_loader: DataLoader of training data
-    optimizer: torch optimizer for linear model
-
-Returns:
-    None
-'''
 
 
 def train_epoch(epoch, probe, train_loader, criterion, optimizer, warmup_scheduler, accumulate, clip_threshold, batches_seen):
+    '''
+    Trains a probe for a single epoch and logs loss/accuracy.
+
+    Parameters:
+        epoch: index of the current epoch
+        probe: model to be trained
+        train_loader: DataLoader of training data
+        criterion: loss function
+        optimizer: torch optimizer for the model
+        warmup_scheduler: learning rate warmup scheduler
+        accumulate: number of batches to accumulate gradients over
+        clip_threshold: threshold for gradient clipping
+        batches_seen: number of batches seen so far
+
+    Returns:
+        None
+    '''
     probe.train()
+    for batch_idx, (embeddings, tokens) in enumerate(train_loader):
+        embeddings, tokens = embeddings.to(device), tokens.to(device).float()
+        # check for NaNs/Infs
+        assert (not torch.isnan(embeddings).any() and not torch.isinf(embeddings).any())
+        assert (not torch.isnan(tokens).any()
+                and not torch.isinf(tokens).any())
 
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device).float()
-        assert (not torch.isnan(data).any() and not torch.isinf(data).any())
-        assert (not torch.isnan(target).any()
-                and not torch.isinf(target).any())
-
-        output = probe(data.float()).to(device)
-        loss = criterion(output, target, reduction="mean").float()
+        output = probe(embeddings.float()).to(device)
+        loss = criterion(output, tokens, reduction="mean").float()
         loss.backward()
 
-        if batch_idx % accumulate == 0 and batch_idx > 0:
-            # print(probe.fc.weight.grad[0][:10])
+        if batch_idx % accumulate == 0 and batch_idx > 0: # accumulate gradients over accumulate batches
             torch.nn.utils.clip_grad_norm_(probe.parameters(), clip_threshold)
             optimizer.step()
             optimizer.zero_grad()
 
-        loss = loss.detach().item()
+        loss = loss.detach().item() # detach loss from the graph
 
         # learning rate warmup for AdamW.
         if warmup_scheduler is not None:
@@ -152,11 +112,11 @@ def train_epoch(epoch, probe, train_loader, criterion, optimizer, warmup_schedul
         # print training accuracy/loss every 10 epochs, and on the last epoch
         if batch_idx % max(accumulate, 10) == 0 or batch_idx == len(train_loader) - 1:
             train_acc = 100 * \
-                (sum(_topktoks(output) == _topktoks(target)) / len(output))
-            if torch.isinf(train_acc).any(): # if there are any infinities in the training accuracy
+                (sum(_topktoks(output) == _topktoks(tokens)) / len(output))
+            if torch.isinf(train_acc).any(): 
                 print('denom', len(output), 'numerator', sum(
-                    _topktoks(output) == _topktoks(target))) # print the numerator and denominator
-                print(_topktoks(output), _topktoks(target)) # print the offending tokens
+                    _topktoks(output) == _topktoks(tokens))) 
+                print(_topktoks(output), _topktoks(tokens))  # print the tokens that are causing the inf
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tTraining Acc:{:3.3f}%\tBatch Loss: {:.6f} ({} tokens)'.format(
                 epoch, batch_idx, len(train_loader), 100. *
                 batch_idx / len(train_loader),
@@ -165,41 +125,41 @@ def train_epoch(epoch, probe, train_loader, criterion, optimizer, warmup_schedul
             wandb.log({"train_loss": loss, "train_acc": train_acc,
                        "epoch": epoch, "batches_seen": 1 + batch_idx + batches_seen})
 
-    return 1 + batch_idx + batches_seen
+    return 1 + batch_idx + batches_seen # return total number of batches seen so far
 
-
-'''
-Tests a probe on the given data.
-
-Parameters:
-    probe: linear model to test
-    test_loader: DataLoader containing testing data
-
-Returns:
-    test_loss: average test loss for data in test_loader
-    test_acc: average test accuracy for data in test_loader
-'''
 
 
 def test(probe, test_loader, criterion, k=5):
+    '''
+    Tests a probe on the given data.
+
+    Parameters:
+        probe: a model to test
+        test_loader: DataLoader containing testing data
+        criterion: loss function
+        k: top k accuracy
+    Returns:
+        test_loss: average test loss for data in test_loader
+        test_acc: average test accuracy for data in test_loader
+    '''
     probe.eval()
     total_loss = 0.0
     total_toks = 0
     correct = 0
     topk_correct = 0
     with torch.no_grad():
-        for (data, targets) in baukit.pbar(test_loader):
-            data, targets = data.to(device), targets.to(device)
+        for (embeddings, tokens) in baukit.pbar(test_loader):
+            embeddings, tokens = embeddings.to(device), tokens.to(device)
 
-            output = probe(data.float()).to(device)
+            output = probe(embeddings.float()).to(device)
 
-            loss = criterion(output, targets, reduction="mean")
+            loss = criterion(output, tokens, reduction="mean")
             total_loss += loss.detach().item()
 
             # save all the pred vs target, along with the current token.
             for i, v in enumerate(output):
                 # target[i] is one-hot vector
-                actual_tok = _topktoks(targets[i])
+                actual_tok = _topktoks(tokens[i])
                 predicted_tok = _topktoks(v)
 
                 total_toks += 1
@@ -217,12 +177,22 @@ def test(probe, test_loader, criterion, k=5):
 
 
 def main(args):
+    """
+    Main function for training a probe model.
+
+    Args:
+        args (argparse.Namespace): Command-line arguments.
+
+    Returns:
+        None
+    """
     run_name = add_args("BASELINE", args)
     wandb.init(project=args.wandb_proj, name=run_name, config=args,
                settings=wandb.Settings(start_method="fork"))
 
     dataset = AllEmbeds(model, tokenizer, MODEL_NAME,
                         WINDOW_SIZE, VOCAB_SIZE, device)
+    allembeds_collate = dataset.allembeds_collate
 
     probe = None
     if args.probe_model == 'linear':
@@ -235,11 +205,9 @@ def main(args):
         probe = RNNModel(model.lm_head.in_features, VOCAB_SIZE).to(device)
         wandb.watch(probe)
 
-    # drop_last must be True for val and test so that we can average over batch loss avgs.
+    # drop_last determines what happens when the total number of samples in a dataset is not a multiple of the batch size.
+    # this must be True for val and test so that we can average over batch loss avgs
     kwargs = {}
-    # if args.num_workers > 0:
-    #     kwargs['num_workers'] = args.num_workers
-    #     kwargs['multiprocessing_context'] = 'spawn' # helps with lab machines, but not on cais
     train_loader = DataLoader(dataset=dataset, batch_size=args.probe_bsz, collate_fn=allembeds_collate,
                               drop_last=False, pin_memory=True, shuffle=True, **kwargs)
     val_loader = DataLoader(dataset=dataset, batch_size=args.probe_bsz, collate_fn=allembeds_collate,

@@ -5,10 +5,12 @@ import torch
 
 def _topktoks(hs, k=1):
     """
-    Returns the top k tokens from the given hidden state.
+    Returns the top k tokens from the given tensor.
+
+    In our case, the tensor is the batch of one-hot encodings of the tokens of a document (one document per batch).
 
     Parameters:
-    hs (torch.Tensor): Input hidden state tensor of shape (batch_size, sequence_length, num_classes).
+    hs (torch.Tensor): Input tensor of shape (batch_size, sequence_length, size_of_vocabulary).
     k (int): The number of top tokens to return. Default is 1.
 
     Returns:
@@ -20,10 +22,12 @@ def _topktoks(hs, k=1):
 
 def _topkprobs(hs, tokenizer, k=5):
     """
-    Compute the top-k probabilities and corresponding tokens from the given hidden state.
+    Compute the top-k probabilities and corresponding tokens from the given tensor. 
+
+    In our case, the tensor is the batch of one-hot encodings of the tokens of a document (one document per batch).
 
     Args:
-        hs (torch.Tensor): Input hidden state tensor of shape (batch_size, sequence_length, num_classes).
+        hs (torch.Tensor): Input tensor of shape (batch_size, sequence_length, size_of_vocabulary).
         tokenizer: Tokenizer object used to decode the tokens.
         k (int): Number of top probabilities to compute (default: 5).
 
