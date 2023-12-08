@@ -120,7 +120,7 @@ def train_epoch(epoch, probe, train_loader, criterion, optimizer, warmup_schedul
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tTraining Acc:{:3.3f}%\tBatch Loss: {:.6f} ({} tokens)'.format(
                 epoch, batch_idx, len(train_loader), 100. *
                 batch_idx / len(train_loader),
-                train_acc.item(), loss, data.size()[0]))
+                train_acc.item(), loss, embeddings.size()[0]))
 
             wandb.log({"train_loss": loss, "train_acc": train_acc,
                        "epoch": epoch, "batches_seen": 1 + batch_idx + batches_seen})
@@ -262,16 +262,15 @@ if __name__ == '__main__':
 
     # training info for linear probe
     parser.add_argument('--probe_model', type=str, choices=['linear', 'mlp', 'rnn'], default='linear')
-    parser.add_argument('--probe_bsz', type=int, default=5)
-    parser.add_argument('--probe_lr', type=float, default=5e-5)
-    parser.add_argument('--probe_momentum', type=float, default=0.9)
-    parser.add_argument('--probe_epochs', type=int, default=5)
+    parser.add_argument('--probe_bsz', type=int, default=1024)
+    parser.add_argument('--probe_lr', type=float, default=1.5)
+    parser.add_argument('--probe_momentum', type=float, default=2)
+    parser.add_argument('--probe_epochs', type=int, default=3)
     parser.add_argument('--probe_dropout', type=float, default=0.5)
     parser.add_argument('--accumulate', type=int, default=1)
-    parser.add_argument('--clip_threshold', type=float, default=0.0)
+    parser.add_argument('--clip_threshold', type=float, default=0.01)
     parser.add_argument('--optimizer', type=str,
-                        choices=['SGD', 'AdamW'], default='SGD')
-    parser.add_argument('--num_workers', type=int, default=0)
+                        choices=['SGD', 'AdamW'], default='AdamW')
     parser.add_argument('--wandb_proj', type=str, default='lexicon-cat-probes')
 
     args = parser.parse_args()
