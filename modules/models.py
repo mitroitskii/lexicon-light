@@ -1,5 +1,5 @@
 '''Models used for training probes'''
-# partially adapted and modified from https://github.com/sfeucht/lexicon as part of collaboration for David Bau's group
+
 import torch
 import torch.nn as nn
 
