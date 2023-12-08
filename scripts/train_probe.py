@@ -128,20 +128,17 @@ Tests a probe on the given data.
 Parameters:
     probe: a model to test
     test_loader: DataLoader containing testing data
-    return_results: boolean indicating whether to 
 
 Returns:
     test_loss: average test loss for data in test_loader
     test_acc: average test accuracy for data in test_loader
-    results: if return_results, pandas DataFrame containing predicted tokens, current tokens, etc.
 '''
-def test(probe, test_loader, criterion, return_results=False, k=5):
+def test(probe, test_loader, criterion, k=5):
     probe.eval()
     total_loss = 0.0
     total_toks = 0
     correct = 0
     topk_correct = 0
-    results = []
     with torch.no_grad():
         for (data, targets, currs, doc_idxs) in baukit.pbar(test_loader):
             data, targets = data.to(device), targets.to(device)
@@ -168,36 +165,12 @@ def test(probe, test_loader, criterion, return_results=False, k=5):
                     correct += 1
                 if actual_tok in _topktoks(v, k=5):
                     topk_correct += 1
-                
-                if return_results:
-                    # "what is the source hidden state encoding rn in terms of output?"
-                    # probably useless but interesting to see just in case 
-                    sourcehs_logitlens = _topktoks(logitlens(data[i]))
-
-                    # BOS token becomes encoded as NaN in pandas here
-                    curr_result = {
-                        "doc_id" : doc_id.item(),
-                        "current_tok_id" : current_tok.item(),
-                        "actual_tok_id" : actual_tok.item(),
-                        "predicted_tok_id" : predicted_tok.item(),
-                        "current_tok" : tokenizer.decode(current_tok.tolist()),
-                        "actual_tok" : tokenizer.decode(actual_tok.tolist()),
-                        "predicted_tok" : tokenizer.decode(predicted_tok.tolist()),
-                        "sourcehs_logitlens_tok_id" : sourcehs_logitlens.item(),
-                        "sourcehs_logitlens_tok" : tokenizer.decode(sourcehs_logitlens.tolist()),
-                        **_topkprobs(v, tokenizer)
-                    }
-
-                    results.append(curr_result)
                  
     test_loss = total_loss / len(test_loader) # divide total average loss by no. batches
     test_acc = 100 * correct / total_toks
     topk_acc = 100 * topk_correct / total_toks
     
-    if return_results:
-        return test_loss, test_acc, topk_acc, pd.DataFrame(results)
-    else:
-        return test_loss, test_acc, topk_acc
+    return test_loss, test_acc, topk_acc
 
 
 def main(args):
@@ -207,12 +180,6 @@ def main(args):
  
     if args.probe_bsz > 10:
         print(f"The batch size represents number of documents. {args.probe_bsz}>10, you may want to use a smaller batch size.")
-
-    # make dirs that include the wandb id
-    checkpoint_dir = f"../checkpoints/{MODEL_NAME}/{run_name}-{wandb.run.id}"
-    log_dir = f"../logs/{MODEL_NAME}/{run_name}-{wandb.run.id}"
-    os.makedirs(checkpoint_dir, exist_ok=True)
-    os.makedirs(log_dir, exist_ok=True)
 
     train_data = pd.read_csv(args.train_data)
     val_data = pd.read_csv(args.val_data)
@@ -268,7 +235,7 @@ def main(args):
         batches_seen = train_epoch(epoch, probe, train_loader, criterion, optimizer, warmup_scheduler, args.accumulate, args.clip_threshold, batches_seen)
 
         # log validation loss at the end of each epoch to decide early stopping
-        val_loss, val_acc, val_topk_acc = test(probe, val_loader, criterion, return_results=False)
+        val_loss, val_acc, val_topk_acc = test(probe, val_loader, criterion)
         wandb.log({"val_loss": val_loss, "val_acc": val_acc, "val_topk_acc": val_topk_acc})
 
         if warmup_scheduler is not None:
@@ -277,10 +244,8 @@ def main(args):
         else:
             scheduler.step(val_loss)
     
-    # Get final testing accuracy and prediction results
-    torch.save(probe.state_dict(), f"{checkpoint_dir}/final.ckpt")
-    test_loss, test_acc, test_topk_acc, test_results = test(probe, test_loader, criterion, return_results=True)
-    test_results.to_csv(log_dir + f"/{datasetname(args.test_data)}_results.csv", quoting=csv.QUOTE_ALL)
+    # Get final testing accuracy
+    test_loss, test_acc, test_topk_acc = test(probe, test_loader, criterion)
     
     print('Test Loss: {:10.4f}  Accuracy: {:3.4f}%\n'.format(test_loss, test_acc))
     wandb.log({"test_loss": test_loss, "test_acc": test_acc, "test_topk_acc": test_topk_acc})
