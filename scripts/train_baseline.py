@@ -1,8 +1,12 @@
 '''
-Running this file will train a linear probe to predict the current (0) or 
-token from the embedding layer for GPT-J, but training it on an evenly-sampled
-distribution of all of the embeddings across the vocab.
+Train a model to predict a token from the embedding on an evenly-sampled
+distribution of all of the embeddings across the vocabulary
 '''
+# partially adapted from https://github.com/sfeucht/lexicon and modified as part of a research project at David Bau's lab
+# to run this script, use the following command:
+# `python train_baseline.py`
+# the run takes ~12GB-20 of GPU memory depending on the model, so make sure you have enough memory (linear is the smallest, then MLP, then RNN)
+# to be able to log the run with wandb, you need to have a wandb account and be logged in via a wandb cli tool (https://docs.wandb.ai/quickstart)
 import sys
 import gc
 import torch
@@ -27,9 +31,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from modules.state_data import hs_collate
 from modules.training import _topkprobs, _topktoks
 from modules.models import LinearModel, MLPModel, RNNModel
-
-os.environ["CUDA_VISIBLE_DEVICES"]="0" # manually setting cude device to train on kyoto
-#FIXME device should not be hardcoded
 
 lt.monkey_patch()
 gc.collect()

@@ -2,7 +2,10 @@
 Running this file will train a probe to predict the current (0) or 
 previous (-1) token at a specific layer: tok_embeddings, layer.[0-31], output. 
 '''
-# partially adapted and modified from https://github.com/sfeucht/lexicon as part of collaboration for David Bau's group
+# partially adapted from https://github.com/sfeucht/lexicon and modified as part of a research project at David Bau's lab
+# to run this script, use the the run_probe.sh script in the scripts folder
+# the run takes ~3GB of GPU memory per batch, so you may need to reduce the batch size if you run out of memory (see the arguments at the bottom of the script)
+# to be able to log the run with wandb, you need to have a wandb account and be logged in via a wandb cli tool (https://docs.wandb.ai/quickstart)
 import sys
 import gc
 import torch
@@ -28,9 +31,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from modules.training import _topkprobs, _topktoks
 from modules.models import LinearModel, MLPModel, RNNModel
 from modules.state_data import HiddenStateDataset, hs_collate, DocDataset, DocCollate
-
-os.environ["CUDA_VISIBLE_DEVICES"]="1" # manually setting cude device to train on kyoto
-#FIXME device should not be hardcoded
 
 gc.collect()
 torch.cuda.empty_cache()
